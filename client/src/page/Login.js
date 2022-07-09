@@ -3,6 +3,7 @@ import { Formik, Form, Field } from 'formik'
 import { useNavigate } from 'react-router-dom'
 
 //axios
+import axios from 'axios'
 import { axiosInstance } from '../config'
 
 const Login = () => {
@@ -31,13 +32,17 @@ const Login = () => {
 
         const res = await axiosInstance.post(`/api/auth/login`, { data: values })
 
-        if (res.data.status === "ok") {
+        if(res) {
+            if (res.data.status === "ok") {
 
-            console.log("Login success")
-
-            localStorage.setItem('token', res.data.token)
-
-        } else console.log(res.data.error)
+                console.log("Login success")
+    
+                localStorage.setItem('token', res.data.token)
+    
+                navigate('/')
+    
+            } else console.log(res.data.error)
+        }
 
     }
 

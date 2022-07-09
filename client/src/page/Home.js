@@ -9,6 +9,7 @@ import Card from '../components/ads/card/Card'
 
 
 //axios
+import axios from 'axios'
 import { axiosInstance } from '../config'
 
 function Home() {

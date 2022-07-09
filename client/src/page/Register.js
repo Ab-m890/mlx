@@ -6,6 +6,7 @@ import { Box, Grid, TextField, Button } from '@mui/material'
 import { Alert , Snackbar , AlertTitle } from '@mui/material'
 
 //axios
+import axios from 'axios'
 import { axiosInstance } from '../config'
 
 const Register = () => {
@@ -31,16 +32,18 @@ const Register = () => {
                 data: formData
             })
 
-            if(res.data.status === "ok") {
+            if(res) {
+                if(res.data.status === "ok") {
 
-                localStorage.setItem('token',res.data.token)
-                navigate('/')
-
-            }else if(res.data.status === "error") {
-
-                setError(res.data.error)
-
-            }else setError("An Error Occured!")
+                    localStorage.setItem('token',res.data.token)
+                    navigate('/')
+    
+                }else if(res.data.status === "error") {
+    
+                    setError(res.data.error)
+    
+                }else setError("An Error Occured!")
+            }
 
         } catch (err) {
             console.log(err)

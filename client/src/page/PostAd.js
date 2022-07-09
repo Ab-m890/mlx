@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Select, TextField, FormControl, InputLabel, MenuItem, Box, Grid, Alert, AlertTitle, Snackbar } from '@mui/material'
 import { CircularProgress } from '@mui/material'
 //axios
+import axios from 'axios'
 import { axiosInstance } from '../config'
 
 //fie base 64
@@ -41,20 +42,22 @@ const PostAd = () => {
                 token
             })
 
-            if (res.data.status === "error") {
+            if(res) {
+                if (res.data.status === "error") {
 
-                console.log(res.data.error)
-
-                navigate('/login')
-
-            } else if (res.data.status === "ok") {
-
-                setResultCheck("ok")
-
-                const { phone, location } = res.data.data
-
-                setFormData(old => ({ ...old, phone, location }))
-
+                    console.log(res.data.error)
+    
+                    navigate('/login')
+    
+                } else if (res.data.status === "ok") {
+    
+                    setResultCheck("ok")
+    
+                    const { phone, location } = res.data.data
+    
+                    setFormData(old => ({ ...old, phone, location }))
+    
+                }
             }
 
         } catch (err) {

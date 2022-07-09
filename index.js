@@ -12,14 +12,16 @@ const cors = require('cors')
 const bodyParser = require("body-parser")
 
 app.use(cors())
-app.use(express.json({ limit: 1024*1024*50 , extended: true ,type: 'application/json'}))
-app.use(express.urlencoded({ limit: 1024*1024*50 , extended: true ,parameterLimit: 50000 , type: 'application/x-www-form-urlencoded'}))
-app.use(bodyParser.text({ limit: 1024*1024*200 }))
+app.use(express.json({ limit: 1024 * 1024 * 50, extended: true, type: 'application/json' }))
+app.use(express.urlencoded({ limit: 1024 * 1024 * 50, extended: true, parameterLimit: 50000, type: 'application/x-www-form-urlencoded' }))
+app.use(bodyParser.text({ limit: 1024 * 1024 * 200 }))
 
-app.use(express.static(path.join(__dirname , "client/build")))
-app.get("*" , (req , res) => {
-    res.sendFile(path.join(__dirname, "client/build" , "index.html"))
-})
+if (process.env.NOD_ENV === "production") {
+    app.use(express.static(path.join(__dirname, "/client")))
+    app.get("*", (req, res) => {
+        res.sendFile(path.join(__dirname, "/client/build", "index.html"))
+    })
+}
 
 //get router
 const adsRouter = require('./router/ads')
