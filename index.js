@@ -1,5 +1,7 @@
 const express = require('express')
 const app = express()
+const router = express.Router()
+const path = require('path')
 
 //mongoose
 const mongoose = require('mongoose')
@@ -16,12 +18,27 @@ app.use(express.json({ limit: 1024 * 1024 * 50, extended: true, type: 'applicati
 app.use(express.urlencoded({ limit: 1024 * 1024 * 50, extended: true, parameterLimit: 50000, type: 'application/x-www-form-urlencoded' }))
 app.use(bodyParser.text({ limit: 1024 * 1024 * 200 }))
 
-if (process.env.NOD_ENV === "production") {
-    app.use(express.static(path.join(__dirname, "/client")))
-    app.get("*", (req, res) => {
-        res.sendFile(path.join(__dirname, "/client/build", "index.html"))
-    })
-}
+// if (process.env.NOD_ENV === "production") {
+//     app.use(express.static(path.join(__dirname, "./client")))
+//     app.get("*", (req, res) => {
+//         res.sendFile(path.join(__dirname, "./client/build", "index.html"))
+//     })
+// }
+
+app.use(express.static('client/build'))
+app.get("*", (req, res) => {
+    res.sendFile(`${__dirname}/client/build/index.html`)
+})
+
+// app.use(express.static(path.join(__dirname, "./client/build")))
+
+// const buildPath = path.normalize(path.join(__dirname, "./client/build"))
+// app.use(express.static(buildPath))
+
+// router.get("(/*)?", (req, res) => {
+//     res.sendFile(path.join(buildPath , 'index.html'))
+// })
+// app.use(router)
 
 //get router
 const adsRouter = require('./router/ads')
@@ -48,6 +65,12 @@ app.listen(port, () => {
 
 })
 
+// app.get('/' , (req ,res) => {
+//     res.send("Hello from home page")
+// })
+
 //routes
 app.use('/api/ads', adsRouter)
 app.use('/api/auth', authRouter)
+
+module.exports = app

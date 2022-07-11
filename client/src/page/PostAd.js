@@ -61,6 +61,8 @@ const PostAd = () => {
             }
 
         } catch (err) {
+            setError(err)
+            setResultCheck("error")
             console.log(err)
         }
     }
@@ -158,6 +160,7 @@ const PostAd = () => {
                 onSubmit={onSubmitForm}
             >
                 {resultCheck === "loading" ? <CircularProgress /> :
+                    resultCheck === "error" ? <h1>An Error Occured</h1> :
                     resultCheck === "ok" &&
                     <Grid
                         maxWidth={600}
@@ -323,7 +326,7 @@ const PostAd = () => {
                             <button type="submit" >Submit</button>
                         </Grid>
                     </Grid>}
-                {error &&
+                {/* {error &&
                     <Snackbar
                         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
                         style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
@@ -341,7 +344,7 @@ const PostAd = () => {
                             </AlertTitle>
                             {error}
                         </Alert>
-                    </Snackbar>}
+                    </Snackbar>} */}
             </Box>
         </section>
     )
