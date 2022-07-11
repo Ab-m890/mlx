@@ -18,12 +18,12 @@ app.use(express.json({ limit: 1024 * 1024 * 50, extended: true, type: 'applicati
 app.use(express.urlencoded({ limit: 1024 * 1024 * 50, extended: true, parameterLimit: 50000, type: 'application/x-www-form-urlencoded' }))
 app.use(bodyParser.text({ limit: 1024 * 1024 * 200 }))
 
-// if (process.env.NOD_ENV === "production") {
-//     app.use(express.static(path.join(__dirname, "./client")))
-//     app.get("*", (req, res) => {
-//         res.sendFile(path.join(__dirname, "./client/build", "index.html"))
-//     })
-// }
+if (process.env.NOD_ENV === "production") {
+    app.use(express.static('client/build'))
+    app.get("*", (req, res) => {
+        res.sendFile(`${__dirname}/client/build/index.html`)
+    })
+}
 
 app.use(express.static('client/build'))
 app.get("*", (req, res) => {
@@ -44,14 +44,8 @@ app.get("*", (req, res) => {
 const adsRouter = require('./router/ads')
 const authRouter = require('./router/auth')
 
-
-
-
-//port
-const port = process.env.PORT || 8080
-
-//connect to mongo db
-app.listen(port, () => {
+//connect to server
+app.listen(process.env.PORT || 8080, () => {
     console.log(`Connect port suuccessfully`)
     mongoose.connect(url, {
         useUnifiedTopology: true,
