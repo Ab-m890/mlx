@@ -1,10 +1,6 @@
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
-const imagesLength = val => {
-    return val.length > 0
-}
-
 const adsSchema = new Schema({
     owner: {
         type: String,
@@ -14,11 +10,13 @@ const adsSchema = new Schema({
         type: String,
         required: true,
         max: 50,
+        min: 1,
     },
     description: {
         type: String,
         required: true,
         max: 4096,
+        min: 1
     },
     price: {
         type: Number,
@@ -46,9 +44,12 @@ const adsSchema = new Schema({
     },
     images: {
         type: [{
-            type: String
+            type: String,
+            required: true,
         }],
     },
 }, {timestamps: true})
+
+adsSchema.index({title: "text" , description: "text"})
 
 module.exports = mongoose.model('Ads', adsSchema)

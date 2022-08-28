@@ -1,73 +1,144 @@
-const authModule = require('../modules/auth')
+const authModule = require('../models/auth')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
-const JWT_SECRET = "qwertyuiopasdfghjklzxcvbnm1234567890-=+_{})(*&^%$#@!~`?/>.<,':;|\}[]"
+const JWT_SECRET = process.env.JWT_SECRET
 
 const register = (req, res) => {
 
-    const { password } = req.body.data
+    try {
+        const { name, email, password, phone, location } = req.body.data
 
-    const hashPassword = bcrypt.hashSync(password, 10)
-
-    const reg = new authModule({
-        ...req.body.data,
-        password: hashPassword
-    })
-
-    reg.save()
-        .then(user => {
-
-            const token = jwt.sign(
-                {
-                    _id: user._id,
-                    email: user.email
-                },
-                JWT_SECRET
+        if (
+            !(
+                name &&
+                email &&
+                password &&
+                phone &&
+                location
             )
+        ) {
 
-            res.json({ status: "ok", token })
+            return res.json({ status: "required", requiredText: "All Fields Required" })
 
-        }).catch(err => {
+        } else if (password.length < 8) {
 
-            if (err.code === 11000) {
-                res.json({ status: "error", error: "Email already exist" })
-            }
+            return res.json({ status: "error", error: "Password is short" })
 
-            res.json({ status: "error", error: err })
+        } else {
 
-        })
+            const hashPassword = bcrypt.hashSync(password, 10)
+
+            const reg = new authModule({
+                ...req.body.data,
+                password: hashPassword
+            })
+
+            reg.save()
+                .then(user => {
+
+                    const token = jwt.sign(
+                        {
+                            _id: user._id,
+                            email: user.email
+                        },
+                        JWT_SECRET
+                    )
+                    return res.cookie("token", token, {
+                        httpOnly: true,
+                    }).json({ status: "ok" })
+
+                }).catch(err => {
+
+                    if (err.code === 11000) {
+                        res.json({ status: "error", error: "Email already exist" })
+                    }else res.json({ status: "error", error: err.message })
+
+                })
+        }
+    }catch(error) {
+        res.json({status: "error" , error: error.message})
+    }
 
 }
 
 const login = (req, res) => {
 
-    const { email, password } = req.body.data
+    try {
+        const { email, password } = req.body.data
 
-    authModule.findOne({ email: email }, async (error, user) => {
-        if (error) {
-            res.json({ status: "error", error: "An Error Occured" })
+        if (
+            !(
+                email &&
+                password
+            )
+        ) {
+            return res.json({ status: "required", requiredText: "All Fields Required" })
         } else {
-            if (user) {
 
-                const comparPassword = await bcrypt.compare(password, user.password)
+            authModule.findOne({ email: email }, async (error, user) => {
+                if (error) {
+                    return res.json({ status: "error", error })
+                } else {
+                    if (user) {
 
-                if (comparPassword) {
-                    const token = jwt.sign(
-                        {
-                            _id: user._id,
-                            email
-                        },
-                        JWT_SECRET
-                    )
+                        const comparPassword = await bcrypt.compare(password, user.password)
 
-                    res.json({ status: "ok", token })
+                        if (comparPassword) {
+                            const token = jwt.sign(
+                                {
+                                    _id: user._id,
+                                    email
+                                },
+                                JWT_SECRET
+                            )
 
-                }else res.json({status: "error" , error: "Incorrect password"})
+                            return res.cookie('token', token, {
+                                httpOnly: true,
+                            }).json({ status: "ok" })
 
-            } else res.json({ status: "error", error: "Incorrect email" })
+                        } else return res.json({ status: "error", error: "Incorrect password" })
+
+                    } else return res.json({ status: "error", error: "Incorrect email" })
+                }
+            })
         }
-    })
 
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
 }
 
-module.exports = { register, login }
+const getAccount = async (req , res) => {
+    try{
+        const owner = req.owner
+        const account = await authModule.findById(owner)
+        res.json({status: "ok" , account})
+    }catch(error) {
+        res.json({status: "error" , error: error.message})
+    }
+}
+
+const EditAccount = async (req , res) => {
+    try{
+        const owner = req.owner
+        authModule.findByIdAndUpdate(owner , req.body.data)
+        .then(() => {
+            res.json({status: "ok"})
+        })
+        .catch(error => {
+            res.json({status: "error" , error: error.message})
+        })
+    }catch(error) {
+        res.json({status: "error" , error: error.message})
+    }
+}
+
+const logout = (req , res) => {
+    try{
+        res.clearCookie('token').json({status: "ok"})
+    }catch(error) {
+        res.json({status: "error" , error: error.message})
+    }
+}
+
+module.exports = { register, login , getAccount , EditAccount , logout}

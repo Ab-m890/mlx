@@ -1,19 +1,28 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+//firebase
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+
 //mui
-import { Select, TextField, FormControl, InputLabel, MenuItem, Box, Grid, Alert, AlertTitle, Snackbar } from '@mui/material'
+import { Typography, Box, Grid, Alert, AlertTitle, Snackbar, Button } from '@mui/material'
 import { CircularProgress } from '@mui/material'
-//axios
-import axios from 'axios'
+
+//formik
+import { Formik, Form, Field, ErrorMessage } from 'formik'
+
+//axiosos'
 import { axiosInstance } from '../config'
 
-//fie base 64
-import FileBase64 from 'react-file-base64'
+//api cities and categorys
+import lebanonCities from '../api/lebanon-cities/lb'
+import allCategories from '../api/categories/categories'
 
 const PostAd = () => {
 
-    const [formData, setFormData] = useState({
+    const navigate = useNavigate()
+
+    const formData = {
         title: '',
         price: '',
         currency: '',
@@ -23,330 +32,494 @@ const PostAd = () => {
         location: '',
         images: [],
         description: '',
-    })
+    }
+
+    const [isRequired, setIsRequired] = useState(false)
+
+    const [requiredText, setRequiredText] = useState('')
+
+    const [isError, setIsError] = useState(false)
 
     const [error, setError] = useState('')
 
-    const [resultCheck, setResultCheck] = useState("loading")
+    const [imagesUpload, setImagesUpload] = useState([])
 
-    const [imagesShoose, setImagesShoose] = useState([])
+    const [isSend, setIsSend] = useState(false)
 
-    const navigate = useNavigate()
+    const [success, setSuccess] = useState(false)
 
-    const checkUser = async () => {
+    const cities = lebanonCities
 
-        const token = localStorage.getItem('token')
+    const categories = allCategories
 
-        try {
-            const res = await axiosInstance.post(`/api/auth/check`, {
-                token
-            })
-
-            if(res) {
-                if (res.data.status === "error") {
-
-                    console.log(res.data.error)
-    
-                    navigate('/login')
-    
-                } else if (res.data.status === "ok") {
-    
-                    setResultCheck("ok")
-    
-                    const { phone, location } = res.data.data
-    
-                    setFormData(old => ({ ...old, phone, location }))
-    
-                }
-            }
-
-        } catch (err) {
-            setError(err)
-            setResultCheck("error")
-            console.log(err)
-        }
+    const uploadImageToStorage = async (file) => {
+        const storage = getStorage();
+        const storageRef = ref(storage, `images/mlx/${Date.now()}`);
+        return new Promise(resolve => {
+            const uploadTask = uploadBytesResumable(storageRef, file);
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                },
+                (error) => {
+                    setIsError(true)
+                    setError(error.message)
+                },
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                        resolve(downloadURL)
+                    });
+                })
+        })
     }
 
-    useEffect(() => {
+    const sendDataToDatabase = async (values) => {
 
-        checkUser()
-
-    }, [])
-
-    const sendDataToDatabase = async () => {
-
-        const token = localStorage.getItem('token')
+        setIsSend(true)
 
         try {
+
+            const imagesUrl = []
+
+            for (const image of imagesUpload) {
+                const url = await uploadImageToStorage(image)
+                imagesUrl.push(url)
+            }
+
             const res = await axiosInstance.post('/api/ads/ad', {
-
-                formData,
-                token,
-
+                ...values,
+                images: [...imagesUrl]
             })
 
             if (res.data.status === "ok") {
-
-                console.log("Ok")
-                console.log(res.data.data)
+                setSuccess(true)
+                navigate(`/ad/${res.data.id}`)
 
             } else if (res.data.status === "error") {
-                console.log(res.data.error)
+                setIsError(true)
+                setError(res.data.error)
+            } else if (res.data.status === "auth") {
+                navigate('/login')
+            } else if (res.data.status === "required") {
+                setIsRequired(true)
+                setRequiredText(res.data.requiredText)
             }
-        } catch (err) {
-            console.log(err)
+        } catch (error) {
+            setIsError(true)
+            setError(error.message)
         }
+
+        setIsSend(false)
     }
 
-    const onSubmitForm = (e) => {
-        e.preventDefault()
-        if (
-            !(
-                formData.title &&
-                formData.price &&
-                formData.currency &&
-                formData.status &&
-                formData.phone &&
-                formData.location &&
-                formData.category &&
-                formData.images.length > 0 &&
-                formData.description
-            )
-        ) setError("All Field Required !")
-        else {
-            sendDataToDatabase()
-        }
+    const onSubmitForm = (values) => {
+        sendDataToDatabase(values)
     }
 
-    const imagesView = useMemo(() => {
+    const validate = values => {
+        let error = {}
 
-        const imagesUrl = imagesShoose.map(e => {
-            return e.base64
-        })
+        if (!values.title) {
+            error.title = "Enter title"
+        }
 
-        // const imagesUrl = imagesShoose.map(e => {
-        //     return URL.createObjectURL(e)
-        // })
+        if (!values.price) {
+            error.price = "Enter price"
+        }
 
-        setFormData(old => ({ ...old, images: [...imagesUrl] }))
+        if (!values.currency) {
+            error.currency = "Select currency"
+        }
 
-        return imagesUrl
+        if (!values.category) {
+            error.category = "Select category"
+        }
 
-    }, [imagesShoose])
+        if (!values.status) {
+            error.status = "Select status"
+        }
 
-    const displayImages = imagesView.map((src, i) => {
+        if (!values.phone) {
+            error.phone = "Enter your phone number"
+        }
+
+        if (!values.location) {
+            error.location = "Select your location"
+        }
+
+        if (imagesUpload.length === 0) {
+            error.images = "Shoose images"
+        }
+
+        if (!values.description) {
+            error.description = "Enter description"
+        }
+
+        return error
+    }
+
+    const displayImages = imagesUpload.length > 0 ? imagesUpload.map((file, i) => {
         return (
             <Grid
                 key={i} item xs={3}
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
+                mb={4}
             >
-                <img src={src} style={{ width: '100%', maxHeight: '100%' }} />
+                <img src={URL.createObjectURL(file)} style={{ width: '100%', maxHeight: '100%' }} />
             </Grid>
         )
-    })
+    }) : []
+
 
     return (
-
-        <section style={{ padding: '20px' }}>
-            <Box
-                component="form"
-                width="100%"
-                minHeight="100vh"
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
+        <Box sx={{ padding: "20px" }}>
+            <Formik
+                initialValues={formData}
+                validate={validate}
                 onSubmit={onSubmitForm}
+                encType="multipart/form-data"
             >
-                {resultCheck === "loading" ? <CircularProgress /> :
-                    resultCheck === "error" ? <h1>An Error Occured</h1> :
-                    resultCheck === "ok" &&
-                    <Grid
-                        maxWidth={600}
-                        container
-                        rowSpacing={{ xs: 2, sm: 3, md: 4 }}
+                <Form>
+                    <Box
+                        width="100%"
+                        minHeight="100vh"
+                        display="flex"
+                        justifyContent="center"
+                        alignItems="center"
+                        onSubmit={onSubmitForm}
+                        encType="multipart/form-data"
                     >
+                        <Grid
+                            maxWidth={600}
+                            container
+                            rowSpacing={{ xs: 2, sm: 3, md: 4 }}
+                        >
 
-                        {/* title of ad */}
-                        <Grid item xs={12}>
-                            <TextField
-                                label="Title"
-                                name="title"
-                                fullWidth
-                                value={formData.title}
-                                onChange={(e => setFormData(old => ({ ...old, title: e.target.value })))}
-                            />
-                        </Grid>
+                            {/* title of ad */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Title</Typography>
+                                <Field
+                                    name="title"
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
+                                />
+                                <ErrorMessage name="title">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                        {/* price of ad */}
-                        <Grid item xs={12}>
-                            <TextField
-                                type="number"
-                                label="Price"
-                                name="price"
-                                fullWidth
-                                value={formData.price}
-                                onChange={(e => setFormData(old => ({ ...old, price: e.target.value })))}
-                            />
-                        </Grid>
+                            {/* price of ad */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Price</Typography>
+                                <Field
+                                    type="number"
+                                    name="price"
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
+                                />
+                                <ErrorMessage name="price">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
 
-                        {/* currency */}
-                        <Grid item xs={12}>
-                            <FormControl fullWidth>
-                                <InputLabel id="currencyLabel">Currency</InputLabel>
-                                <Select
-                                    labelId="currencyLabel"
-                                    label="Currrency"
+                            {/* currency */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Currency</Typography>
+                                <Field
+                                    as="select"
                                     name="currency"
-                                    id="currency"
-                                    value={formData.currency}
-                                    onChange={(e => setFormData(old => ({ ...old, currency: e.target.value })))}
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
                                 >
+                                    <option value="" disabled defaultValue hidden>Currency</option>
+                                    <option value="$">$</option>
+                                    <option value="LBP">LBP</option>
+                                </Field>
+                                <ErrorMessage name="currency">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                                    <MenuItem value="$">$</MenuItem>
-
-                                    <MenuItem value="LBP">LBP</MenuItem>
-
-                                </Select>
-                            </FormControl>
-                        </Grid>
-
-                        {/* category */}
-                        <Grid item xs={12}>
-                            <FormControl fullWidth>
-                                <InputLabel id="categoryLabel">Category</InputLabel>
-                                <Select
-                                    labelId="categoryLabel"
-                                    label="Category"
+                            {/* category */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Category</Typography>
+                                <Field
+                                    as="select"
                                     name="category"
-                                    id="category"
-                                    value={formData.category}
-                                    onChange={(e => setFormData(old => ({ ...old, category: e.target.value })))}
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
                                 >
+                                    <option value="" disabled defaultValue hidden>Category</option>
+                                    {
+                                        categories.map((category, i) => {
+                                            return (
+                                                <option key={i} value={category}>{category}</option>
+                                            )
 
-                                    <MenuItem value="Cars">Cars</MenuItem>
+                                        })
+                                    }
+                                </Field>
+                                <ErrorMessage name="category">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                                    <MenuItem value="Mobile Phones and Accessories">Mobile phones and Accessories</MenuItem>
-
-                                    <MenuItem value="Home Furniture & Decor">Home furniture & Decor</MenuItem>
-
-                                    <MenuItem value="Fashion and beauty">Fashion and beauty</MenuItem>
-
-                                    <MenuItem value="Kids and babies">Kids and babies</MenuItem>
-
-                                    <MenuItem value="Sports and Equipments">Sports and Equipments</MenuItem>
-
-                                    <MenuItem value="Electronics">Electronics</MenuItem>
-
-                                    <MenuItem value="Hobbies , Music , Arts and Books">Hobbies , Music , Arts and Books</MenuItem>
-
-                                </Select>
-                            </FormControl>
-                        </Grid>
-
-                        {/* status */}
-                        <Grid item xs={12}>
-                            <FormControl fullWidth>
-                                <InputLabel id="statusLabel">Status</InputLabel>
-                                <Select
-                                    labelId="statusLabel"
-                                    label="Status"
+                            {/* status */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Status</Typography>
+                                <Field
+                                    as="select"
                                     name="status"
-                                    id="status"
-                                    value={formData.status}
-                                    onChange={(e => setFormData(old => ({ ...old, status: e.target.value })))}
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
                                 >
+                                    <option value="" disabled defaultValue hidden>Status</option>
+                                    <option value="new">New</option>
+                                    <option value="used">Used</option>
+                                </Field>
+                                <ErrorMessage name="status">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                                    <MenuItem value="new">New</MenuItem>
 
-                                    <MenuItem value="used">Used</MenuItem>
+                            {/* phone */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Phone</Typography>
+                                <Field
+                                    type="number"
+                                    name="phone"
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
+                                />
+                                <ErrorMessage name="phone">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                                </Select>
-                            </FormControl>
-                        </Grid>
+                            {/* location */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Location</Typography>
+                                <Field
+                                    as="select"
+                                    name="location"
+                                    style={{
+                                        width: "100%",
+                                        height: "56px",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
+                                >
+                                    <option value="" disabled defaultValue hidden>Location</option>
+                                    {
+                                        cities.map((city, i) => {
+                                            return (
+                                                <option key={i} value={city}>{city}</option>
+                                            )
 
+                                        })
+                                    }
+                                </Field>
+                                <ErrorMessage name="location">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                        {/* phone */}
-                        <Grid item xs={12}>
-                            <TextField
-                                type="number"
-                                label="Phone"
-                                name="phone"
-                                fullWidth
-                                value={formData.phone}
-                                onChange={(e => setFormData(old => ({ ...old, phone: e.target.value })))}
-                            />
-                        </Grid>
+                            {/* get file from externel storage */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Shoose images</Typography>
+                                <Field
+                                    type="file"
+                                    style={{
+                                        backgroundColor: "rgb(250,250,250)",
+                                        width: "100%",
+                                        padding: "10px",
+                                        borderRadius: "4px"
+                                    }}
+                                    accept="image/*"
+                                    name="images"
+                                    id="images"
+                                    onChange={(e) => {
+                                        setImagesUpload(Array.from(e.target.files))
+                                    }}
+                                    multiple
+                                />
+                                <ErrorMessage name="images">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
 
-                        {/* location */}
-                        <Grid item xs={12}>
-                            <TextField
-                                type="text"
-                                label="Location"
-                                name="location"
-                                fullWidth
-                                value={formData.location}
-                                onChange={(e => setFormData(old => ({ ...old, location: e.target.value })))}
-                            />
-                        </Grid>
+                            {/* display images shoose of ad */}
+                            {displayImages.length > 0 &&
+                                <Grid item xs={12}>
+                                    <Grid container columnSpacing={4}>
 
-                        {/* get file from externel storage */}
-                        <Grid item xs={12}>
+                                        {displayImages}
 
-                            <FileBase64
-                                multiple={true}
-                                onDone={(base64 => setImagesShoose(base64))}
-                            />
-                        </Grid>
+                                    </Grid>
+                                </Grid>}
 
-                        {/* display images shoose of ad */}
-                        <Grid item xs={12}>
-                            <Grid container columnSpacing={4}>
-
-                                {displayImages}
-
+                            {/* description of ad */}
+                            <Grid item xs={12}>
+                                <Typography color="primary" fontSize="1rem">Description</Typography>
+                                <Field
+                                    as="textarea"
+                                    name="description"
+                                    style={{
+                                        width: "100%",
+                                        borderRadius: "4px",
+                                        outline: "none",
+                                        border: "1px solid rgb(200,200,200)",
+                                        padding: "10px",
+                                        fontSize: "1rem"
+                                    }}
+                                    rows={10}
+                                />
+                                <ErrorMessage name="description">
+                                    {
+                                        error => {
+                                            return <Typography fontSize="1rem" color="error">{error}</Typography>
+                                        }
+                                    }
+                                </ErrorMessage>
+                            </Grid>
+                            <Grid item xs={12}>
+                                {
+                                    isSend ? <CircularProgress /> :
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                        >
+                                            Publish Ad
+                                        </Button>
+                                }
                             </Grid>
                         </Grid>
-
-                        {/* description of ad */}
-                        <Grid item xs={12}>
-                            <TextField
-                                name="description"
-                                label="Description"
-                                fullWidth
-                                multiline
-                                rows={6}
-                                value={formData.description}
-                                onChange={(e => setFormData(old => ({ ...old, description: e.target.value })))}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <button type="submit" >Submit</button>
-                        </Grid>
-                    </Grid>}
-                {/* {error &&
-                    <Snackbar
-                        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-                        style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
-                        open={error ? true : false}
-                        autoHideDuration={2000}
-                        onClose={() => setError('')}
-                    >
-                        <Alert
-                            autoHideDuration={2000}
-                            onClose={() => setError('')}
-                            severity='error'
-                            sx={{ width: '80%', backgroundColor: 'red', color: 'white', fontWeight: '600' }}>
-                            <AlertTitle>
-                                Error
-                            </AlertTitle>
-                            {error}
-                        </Alert>
-                    </Snackbar>} */}
-            </Box>
-        </section>
+                        {(isRequired || isError) &&
+                            <Snackbar
+                                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                                style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                                open={isRequired || isError}
+                                autoHideDuration={2000}
+                                onClose={() => {
+                                    setIsRequired(false)
+                                    setIsError(false)
+                                }}
+                            >
+                                <Alert
+                                    autoHideDuration={2000}
+                                    onClose={() => {
+                                        setIsRequired(false)
+                                        setIsError(false)
+                                    }}
+                                    severity='error'
+                                    sx={{ width: '80%', backgroundColor: 'red', color: 'white', fontWeight: '600' }}>
+                                    <AlertTitle>
+                                        Error
+                                    </AlertTitle>
+                                    {requiredText || error}
+                                </Alert>
+                            </Snackbar>}
+                        {success &&
+                            <Snackbar
+                                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                                style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                                open={success ? true : false}
+                                autoHideDuration={2000}
+                                onClose={() => setSuccess(false)}
+                            >
+                                <Alert
+                                    autoHideDuration={2000}
+                                    onClose={() => setSuccess(false)}
+                                    severity='success'
+                                    sx={{ width: '80%', backgroundColor: 'green', color: 'white', fontWeight: '600' }}>
+                                    Ad saved successfully!
+                                </Alert>
+                            </Snackbar>}
+                    </Box>
+                </Form>
+            </Formik>
+        </Box>
     )
 }
 

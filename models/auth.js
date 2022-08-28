@@ -16,6 +16,10 @@ const authSchema = new Schema({
         required:true,
         type:String,
     },
+    profileImg: {
+        type:String,
+        default: "/images/default.png"
+    },
     phone: {
         required:true,
         type:Number,

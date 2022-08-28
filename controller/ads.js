@@ -1,124 +1,226 @@
-const adsModules = require('../modules/ads')
-const authModules = require('../modules/auth')
-const jwt = require("jsonwebtoken")
-const JWT_SECRET = "qwertyuiopasdfghjklzxcvbnm1234567890-=+_{})(*&^%$#@!~`?/>.<,':;|\}[]"
+const adsModules = require('../models/ads')
+const authModules = require('../models/auth')
 
-const createAd = (req, res) => {
 
-    const ads = new adsModules(req.body.formData)
+//node cache
+const NodeCache = require('node-cache')
+const myCache = new NodeCache({ stdTTL: 60 * 60 })
 
-                    ads.save()
-                        .then((data) => {
-                            res.json({ status: "ok", data })
-                        })
-                        .catch(error => {
-                            res.json({ status: "error", error })
-                        })
 
-}
+const createAd = async (req, res) => {
 
-const updateAd = (req, res) => {
-    adsModules.findById(req.params.id)
-        .then(ad => {
-            if (ad.owner == req.body.owner) {
-                adsModules.findByIdAndUpdate(req.params.id, {
-                    ...req.body.data
+    try {
+        const { title, price, currency, category, status, phone, location, description, images } = req.body
+        const owner = req.owner
+
+        if (
+            !(
+                title &&
+                price &&
+                currency &&
+                status &&
+                phone &&
+                location &&
+                category &&
+                owner &&
+                images.length > 0 &&
+                description
+            )
+        ) res.json({ status: "required", requiredText: "All Rields Required!" })
+        else {
+            const ads = new adsModules({
+                title,
+                price,
+                currency,
+                status,
+                phone,
+                location,
+                category,
+                owner,
+                images,
+                description
+            })
+
+            ads.save()
+                .then((data) => {
+                    res.json({ status: "ok", id: data._id })
                 })
-                    .then(() => {
-                        res.json("update success")
+                .catch(error => {
+                    res.json({ status: "error", error: error.message })
+                })
+        }
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+
+}
+
+const updateAd = async (req, res) => {
+    try {
+        const { title, price, currency, category, status, phone, location, description, images} = req.body
+        const owner = req.owner
+
+        if (
+            !(
+                title &&
+                price &&
+                currency &&
+                status &&
+                phone &&
+                location &&
+                category &&
+                owner &&
+                images.length > 0 &&
+                description
+            )
+        ) res.json({ status: "required", requiredText: "All Rields Required!" })
+        else {
+            const ad = await adsModules.findById(req.params.id)
+            if (ad.owner === owner) {
+                adsModules.findByIdAndUpdate(req.params.id, {
+                    title,
+                    price,
+                    currency,
+                    status,
+                    phone,
+                    location,
+                    category,
+                    images,
+                    description
+                })
+                    .then((ad) => {
+                        res.json({ status: "ok", id: ad._id })
                     })
-                    .catch(err => {
-                        res.status(401).json(err)
+                    .catch(error => {
+                        res.json({ status: "error", error: error.message })
                     })
-            }
-        })
-        .catch(err => res.status(303).json("No data found " + err))
+            } else res.json({ status: "error", error: "You can edit your ads only !" })
+        }
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
 }
 
-const deletAd = (req, res) => {
-    adsModules.findById(req.params.id)
-        .then(ad => {
+const deletAd = async (req, res) => {
+    try {
+        const owner = req.owner
+        const ad = await adsModules.findById(req.params.id)
 
-            if (ad.owner == req.body.owner) {
+        if (ad.owner === owner) {
 
-                adsModules.findByIdAndDelete(req.params.id)
-                    .then(() => {
-                        res.json({ status: "ok" })
-                    })
-                    .catch(err => {
-                        res.json({ status: "error", error: err })
-                    })
+            adsModules.findByIdAndDelete(req.params.id)
+                .then(() => {
+                    res.json({ status: "ok" })
+                })
+                .catch(error => {
+                    res.json({ status: "error", error: error.message })
+                })
 
-            } else res.json({ status: "error", error: req.body.owner })
-        })
-}
-
-
-const getAd = (req, res) => {
-
-    adsModules.findById(req.params.id)
-        .then((ad) => {
-            res.json(ad)
-        })
-        .catch(err => {
-            res.status(401).json(err)
-        })
-}
-
-const getMyAds = (req, res) => {
-
-    const token = req.query.token
-
-    //check and valide token
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-
-        if (err) res.json({ status: "error", error: "You are not login!" })
-
-
-        //check when token exist if exist the child _id
-        if (user._id) {
-            //check if exist user have this _id
-            authModules.findById(user._id)
-                .then(e => {
-
-                    //if not exist return error
-                    if (!e) {
-
-                        res.json({ status: "error", error: "You are not login!" })
-
-                    }
-
-                    //if user exist
-                    adsModules.find({ owner: user._id })
-                        .then((myads) => {
-                            res.json({status: "ok" ,myads})
-                        })
-                        .catch(error => {
-                            res.json({status: "error" , error: "error"})
-                        })
-
-
-
-                }).catch(() => res.json({ status: "error", error: "An Error Occured" }))
-
-        } else res.json({ status: "error", error: "You are not login!" })
-
-    })
-}
-
-const getAllAds = (req, res) => {
-
-    adsModules.find()
-        .then((ad) => {
-            res.json(ad)
-        })
-        .catch(err => {
-            res.status(401).json(err)
-        })
-}
-
-const getByCategory = (req , res) => {
+        } else res.json({ status: "error", error: "You can delete only your ads !" })
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
 
 }
 
-module.exports = { createAd, getAd, getMyAds, getAllAds, updateAd, deletAd , getByCategory}
+
+const getAd = async (req, res) => {
+    try {
+
+        const ad = await adsModules.findById(req.params.id)
+        const owner = await authModules.findById(ad.owner)
+        res.json({ status: "ok", ad, owner })
+
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+}
+
+const getMyAds = async (req, res) => {
+
+    try {
+        const owner = req.owner
+        const myads = await adsModules.find({ owner })
+        res.json({ status: "ok", myads })
+
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+
+}
+
+const getMyAd = async (req, res) => {
+
+    try {
+
+        const { id } = req.params
+
+        const ad = await adsModules.findById(id)
+        res.json({ status: "ok", ad })
+
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+
+}
+
+const getAllAds = async (req, res) => {
+
+    try {
+        const ads = await adsModules.find({})
+        res.json({ status: "ok", ads: ads })
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+}
+
+const getByCategory = async (req, res) => {
+    try {
+
+        const ads = await adsModules.find({ category: req.params.category })
+        res.json({ status: "ok", ads })
+
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+}
+
+const getUserAds = async (req, res) => {
+
+    try {
+
+        const { id } = req.params
+
+        const user = await authModules.findById(id)
+        const ads = await adsModules.find({ owner: id })
+
+        res.json({ status: "ok", ads, user })
+
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+
+}
+
+const searchAds = async (req, res) => {
+    try {
+        const ads = await adsModules.find({
+            $or: [
+                {
+                    title: { $regex: req.query.q, $options: 'i' }
+                },
+                {
+                    description: { $regex: req.query.q, $options: 'i' }
+                },
+                {
+                    category: { $regex: req.query.q, $options: 'i' }
+                }
+            ]
+        })
+        res.json({ status: "ok", ads })
+    } catch (error) {
+        res.json({ status: "error", error: error.message })
+    }
+}
+
+module.exports = { createAd, getAd, getMyAds, getMyAd, getAllAds, updateAd, deletAd, getByCategory, getUserAds, searchAds }

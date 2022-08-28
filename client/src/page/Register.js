@@ -1,17 +1,17 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 //material ui
-import { Box, Grid, TextField, Button } from '@mui/material'
-import { Alert , Snackbar , AlertTitle } from '@mui/material'
+import { Box, Grid, TextField, Button, FormControl, Select, InputLabel, MenuItem, CircularProgress } from '@mui/material'
+import { Alert, Snackbar, AlertTitle } from '@mui/material'
 
 //axios
-import axios from 'axios'
 import { axiosInstance } from '../config'
 
-const Register = () => {
+//get all cities
+import lebanonCities from '../api/lebanon-cities/lb'
 
-    const navigate = useNavigate()
+const Register = () => {
 
     const [formData, setFormData] = useState({
         name: '',
@@ -21,39 +21,56 @@ const Register = () => {
         location: '',
     })
 
+    const cities = lebanonCities
+
+    const [isError, setIsError] = useState(false)
+
     const [error, setError] = useState('')
 
+    const [requiredText, setRequiredText] = useState('')
+
+    const [isRequired, setIsRequired] = useState('')
+
+    const [isSend, setIsSend] = useState(false)
+
     const sendDataToDatabase = async () => {
-        console.log("yes")
-        console.log(formData)
+        setIsError(false)
+        setIsSend(true)
         try {
 
             const res = await axiosInstance.post('/api/auth/register', {
                 data: formData
             })
 
-            if(res) {
-                if(res.data.status === "ok") {
+            if (res) {
+                if (res.data.status === "ok") {
 
-                    localStorage.setItem('token',res.data.token)
-                    navigate('/')
-    
-                }else if(res.data.status === "error") {
-    
+                    window.location = "/"
+
+                } else if (res.data.status === "error") {
+
+                    setIsError(true)
                     setError(res.data.error)
-    
-                }else setError("An Error Occured!")
+
+                } else if (res.data.status === "required") {
+                    setIsRequired(true)
+                    setRequiredText(res.data.requiredText)
+                }
             }
 
         } catch (err) {
             console.log(err)
+            setIsError(true)
             setError(err)
         }
+
+        setIsSend(false)
     }
 
     const onSubmitForm = (e) => {
         e.preventDefault()
-        setError('')
+        setIsError(false)
+        setIsRequired(false)
         if (
             !(
                 formData.name &&
@@ -62,19 +79,28 @@ const Register = () => {
                 formData.phone &&
                 formData.location
             )
-        ) setError("All Field Required !")
+        ) {
+            setIsRequired(true)
+            setRequiredText('All Fields Required')
+        }
         else {
-            setError('')
+            setIsRequired(false)
             sendDataToDatabase()
         }
     }
+
+    const displayCities = cities.map((city, i) => {
+        return (
+            <MenuItem key={i} value={city}>{city}</MenuItem>
+        )
+    })
 
     return (
         <section style={{ padding: '20px' }}>
             <Box
                 component="form"
                 width="100%"
-                minHeight="100vh"
+                minHeight="calc(100vh - 64px)"
                 display="flex"
                 justifyContent="center"
                 alignItems="center"
@@ -141,45 +167,69 @@ const Register = () => {
                     </Grid>
 
                     <Grid item xs={12} >
-                        <TextField
-                            fullWidth
-                            label="Your Location"
-                            variant="outlined"
-                            name="location"
-                            id="location"
-                            type="text"
-                            value={formData.location}
-                            onChange={e => setFormData(old => ({ ...old, location: e.target.value }))}
-                        />
+                        <FormControl fullWidth>
+                            <InputLabel id="categoryLabel">Location</InputLabel>
+                            <Select
+                                labelId="locationLabel"
+                                label="Location"
+                                name="location"
+                                id="location"
+                                value={formData.location}
+                                onChange={(e => setFormData(old => ({ ...old, location: e.target.value })))}
+                            >
+
+                                {displayCities}
+
+                            </Select>
+                        </FormControl>
                     </Grid>
 
                     <Grid item xs={12} >
-                        <Button type="submit" variant="contained">
-                            Register
-                        </Button>
+                        <Box
+                            sx={{
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}
+                        >
+                            {
+                                isSend ? <CircularProgress /> :
+                                    <Button type="submit" variant="contained">
+                                        Register
+                                    </Button>
+                            }
+                            <Link to='/login' style={{ fontSize: '16px' }}>Sign in</Link>
+                        </Box>
                     </Grid>
 
                 </Grid>
 
-                {/* {error &&
+                {(isError || isRequired) &&
                     <Snackbar
                         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
                         style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
-                        open={error ? true : false}
+                        open={isRequired || isError}
                         autoHideDuration={2000}
-                        onClose={() => setError('')}
+                        onClose={() => {
+                            setIsRequired(false)
+                            setIsError(false)
+                        }}
                     >
                         <Alert
                             autoHideDuration={2000}
-                            onClose={() => setError('')}
+                            onClose={() => {
+                                setIsRequired(false)
+                                setIsError(false)
+                            }}
                             severity='error'
                             sx={{ width: '80%', backgroundColor: 'red', color: 'white', fontWeight: '600' }}>
                             <AlertTitle>
                                 Error
                             </AlertTitle>
-                            {error}
+                            {error || requiredText}
                         </Alert>
-                    </Snackbar>} */}
+                    </Snackbar>}
             </Box>
         </section>
     )

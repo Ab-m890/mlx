@@ -1,0 +1,30 @@
+const cities = [
+  "Tripoli",
+  "Beirut",
+  "Sidon",
+  "Tyre",
+  "Jounie",
+  "Zahle",
+  "Nabatiye",
+  "Baalbek",
+  "Amioun",
+  "Baabda",
+  "Marjayoun",
+  "Jdaidet el Matn",
+  "Zgharta",
+  "Aaley",
+  "Jbail",
+  "Danniyé",
+  "Halba",
+  "Bent Jbail",
+  "Jezzine",
+  "Batroun",
+  "Hasbaiya",
+  "Joubb Jannine",
+  "Beit ed Dine", 
+  "El Hermel", 
+  "Rachaiya el Ouadi", 
+  "Bcharre"
+]
+
+export default cities

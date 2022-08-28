@@ -1,11 +1,13 @@
 const express = require('express')
 const app = express()
-const router = express.Router()
 const path = require('path')
+
+//dot env
+require('dotenv').config()
 
 //mongoose
 const mongoose = require('mongoose')
-const url = "mongodb+srv://aboudi:Aboudi123+@cluster0.qoipi.mongodb.net/mlx?retryWrites=true&w=majority"
+const mongooseUrl = process.env.MONGOOSE_URL
 
 //cors
 const cors = require('cors')
@@ -13,62 +15,45 @@ const cors = require('cors')
 //body parser
 const bodyParser = require("body-parser")
 
+// cookie parser
+const cookieParser = require('cookie-parser')
+
+//middlware
 app.use(cors())
-app.use(express.json({ limit: 1024 * 1024 * 50, extended: true, type: 'application/json' }))
-app.use(express.urlencoded({ limit: 1024 * 1024 * 50, extended: true, parameterLimit: 50000, type: 'application/x-www-form-urlencoded' }))
-app.use(bodyParser.text({ limit: 1024 * 1024 * 200 }))
+app.use(bodyParser.json({extended: true , limit: 1024*1024*100}))
+app.use(bodyParser.text({limit: 1024*1024*100}))
+app.use(bodyParser.urlencoded({ extended: true  , limit: 1024*1024*100}))
+app.use(cookieParser())
 
-if (process.env.NOD_ENV === "production") {
-    app.use(express.static('client/build'))
-    app.get("*", (req, res) => {
-        res.sendFile(`${__dirname}/client/build/index.html`)
-    })
-}
-
-// app.use(express.static('client/build'))
-// app.get("*", (req, res) => {
-//     res.sendFile(`${__dirname}/client/build/index.html`)
-// })
-
-app.get('/' , (req, res) => {
-    res.send("Home page")
-})
-
-// app.use(express.static(path.join(__dirname, "./client/build")))
-
-// const buildPath = path.normalize(path.join(__dirname, "./client/build"))
-// app.use(express.static(buildPath))
-
-// router.get("(/*)?", (req, res) => {
-//     res.sendFile(path.join(buildPath , 'index.html'))
-// })
-// app.use(router)
 
 //get router
 const adsRouter = require('./router/ads')
 const authRouter = require('./router/auth')
 
-//connect to server
-app.listen(process.env.PORT || 8080, () => {
-    console.log(`Connect port suuccessfully`)
-    mongoose.connect(url, {
-        useUnifiedTopology: true,
-        useNewUrlParser: true,
-    })
-        .then(res => {
-            console.log(`Connect mongoose suuccessfully`)
-        }).catch(err => {
-            console.log('Connection faild mongoose: ' + err)
-        })
-
-})
-
-// app.get('/' , (req ,res) => {
-//     res.send("Hello from home page")
-// })
-
 //routes
 app.use('/api/ads', adsRouter)
 app.use('/api/auth', authRouter)
 
-module.exports = app
+
+// client routes
+app.use(express.static(path.join(__dirname, "client/build")))
+
+const buildPath = path.normalize(path.join(__dirname, "client/build"))
+
+app.use(express.static(buildPath))
+
+app.get("*", (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'))
+})
+
+//connect to server
+app.listen(process.env.PORT || 8081, () => {
+    console.log(`Connect port suuccessfully`)
+})
+
+mongoose.connect(mongooseUrl)
+    .then(res => {
+        console.log(`Connect mongoose suuccessfully`)
+    }).catch(err => {
+        console.log('Connection faild mongoose: ' + err)
+    })

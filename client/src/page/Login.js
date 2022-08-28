@@ -1,63 +1,176 @@
-import React from 'react'
-import { Formik, Form, Field } from 'formik'
-import { useNavigate } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link} from 'react-router-dom'
+
+//material ui
+import { Box, Grid, TextField, Button, CircularProgress } from '@mui/material'
+import { Alert, Snackbar, AlertTitle } from '@mui/material'
 
 //axios
-import axios from 'axios'
 import { axiosInstance } from '../config'
 
 const Login = () => {
 
-    const navigate = useNavigate()
-
-    const initialValues = {
+    const [formData, setFormData] = useState({
         email: '',
-        password: ''
+        password: '',
+    })
+
+    const [isError, setIsError] = useState(false)
+
+    const [error, setError] = useState('')
+
+    const [requiredText, setRequiredText] = useState('')
+
+    const [isRequired, setIsRequired] = useState('')
+
+    const [isSend, setIsSend] = useState(false)
+
+    const sendDataToDatabase = async () => {
+        setIsError(false)
+        setIsSend(true)
+        try {
+
+            const res = await axiosInstance.post('/api/auth/login', {
+                data: formData
+            })
+
+            if (res) {
+                if (res.data.status === "ok") {
+
+                    window.location = "/"
+
+                } else if (res.data.status === "error") {
+
+                    setIsError(true)
+                    setError(res.data.error)
+
+                } else if (res.data.status === "required") {
+                    setIsRequired(true)
+                    setRequiredText(res.data.requiredText)
+                }
+            }
+
+        } catch (err) {
+            console.log(err)
+            setIsError(true)
+            setError(err)
+        }
+
+        setIsSend(false)
     }
 
-    const validate = values => {
-        let error = {}
-        if (!values.email) {
-            error.email = 'Email required'
+    const onSubmitForm = (e) => {
+        e.preventDefault()
+        setIsError(false)
+        setIsRequired(false)
+        if (
+            !(
+                formData.email &&
+                formData.password
+            )
+        ) {
+            setIsRequired(true)
+            setRequiredText('All Fields Required')
         }
-
-        if (!values.password) {
-            error.password = 'Password required'
+        else {
+            setIsRequired(false)
+            sendDataToDatabase()
         }
-
-        return error
-    }
-
-    const onSubmit = async (values) => {
-
-        const res = await axiosInstance.post(`/api/auth/login`, { data: values })
-
-        if(res) {
-            if (res.data.status === "ok") {
-
-                console.log("Login success")
-    
-                localStorage.setItem('token', res.data.token)
-    
-                navigate('/')
-    
-            } else console.log(res.data.error)
-        }
-
     }
 
     return (
-        <Formik
-            initialValues={initialValues}
-            onSubmit={onSubmit}
-            validate={validate}
-        >
-            <Form>
-                <Field name="email" id="email" placeholder="email" /><br />
-                <Field name="password" id="password" placeholder="password" />
-                <button type="submit" >Submit </button>
-            </Form>
-        </Formik>
+        <section style={{ padding: '20px' }}>
+            <Box
+                component="form"
+                width="100%"
+                minHeight="calc(100vh - 64px)"
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                onSubmit={onSubmitForm}
+
+            >
+
+                <Grid
+                    container
+                    rowSpacing={{ xs: 2, sm: 3, md: 4 }}
+                    maxWidth={600}
+                >
+
+                    <Grid item xs={12} >
+                        <TextField
+                            fullWidth
+                            label="Email Address"
+                            variant="outlined"
+                            name="email"
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={e => setFormData(old => ({ ...old, email: e.target.value }))}
+                        />
+                    </Grid>
+
+                    <Grid item xs={12} >
+                        <TextField
+                            fullWidth
+                            label="Password"
+                            variant="outlined"
+                            name="password"
+                            id="password"
+                            type="password"
+                            value={formData.password}
+                            onChange={e => setFormData(old => ({ ...old, password: e.target.value }))}
+                        />
+                    </Grid>
+
+                    <Grid item xs={12} >
+                        <Box
+                            sx={{
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}
+                        >
+                            {
+                                isSend ? <CircularProgress /> :
+                                    <Button type="submit" variant="contained">
+                                        Register
+                                    </Button>
+                            }
+                            <Link to='/register' style={{ fontSize: '16px' }}>Sign up</Link>
+                        </Box>
+                    </Grid>
+
+                </Grid>
+
+                {(isError || isRequired) &&
+                    <Snackbar
+                        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                        style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                        open={isRequired || isError}
+                        autoHideDuration={2000}
+                        onClose={() => {
+                            setIsRequired(false)
+                            setIsError(false)
+                        }}
+                    >
+                        <Alert
+                            autoHideDuration={2000}
+                            onClose={() => {
+                                setIsRequired(false)
+                                setIsError(false)
+                            }}
+                            severity='error'
+                            sx={{ width: '80%', backgroundColor: 'red', color: 'white', fontWeight: '600' }}>
+                            <AlertTitle>
+                                Error
+                            </AlertTitle>
+                            {error || requiredText}
+                        </Alert>
+                    </Snackbar>}
+            </Box>
+        </section>
     )
 }
 
