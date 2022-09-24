@@ -2,20 +2,6 @@ const express = require('express')
 const router = express.Router()
 const path = require('path')
 
-//multer
-const multer = require('multer');
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'images');
-  },
-  filename: (req, file, cb) => {
-    cb(null,`${file.fieldname}-${Date.now()}-${file.originalname}`);
-  }
-});
-
-const upload = multer({ storage: storage });
-
 //controller
 const adsController = require('../controller/ads')
 
@@ -44,11 +30,11 @@ router.get('/user/:id',adsController.getUserAds)
 router.get('/search' , adsController.searchAds)
 
 //add an ad
-router.post('/ad', check , upload.array('images') ,adsController.createAd)
+router.post('/ad', check,adsController.createAd)
 
 //update ad
 // router.put('/ad/:id',check)
-router.put('/ad/:id', check, upload.array('images') , adsController.updateAd)
+router.put('/ad/:id', check, adsController.updateAd)
 
 //delete
 // router.delete('/ad/:id',check)
