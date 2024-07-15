@@ -7,8 +7,7 @@ require('dotenv').config()
 
 //mongoose
 const mongoose = require('mongoose')
-const mongooseUrl = process.env.MONGOOSE_URL
-
+const mongooseUrl = "mongodb+srv://aboudi:Aboudi123+@cluster0.qoipi.mongodb.net/mlx?retryWrites=true&w=majority"
 //cors
 const cors = require('cors')
 
